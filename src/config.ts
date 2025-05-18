@@ -1,43 +1,60 @@
 import logs, { infoRGB, errorRGB } from "./logs.ts";
 
-export type ConfigKey = "voltaicName" | "apiUrl" | "aimtrainer" | "skilltier";
+export type ConfigKey = "voltaicName" | "apiUrl" | "aimtrainer" | "skilltier" | "season" | "steamId";
 export const AimtrainerTypes = [ "kovaaks", "aimlabs" ];
 export const SkillTierTypes = [ "novice", "intermediate", "advanced" ];
 
 
-export const ConfigSchema: {
-  [key in ConfigKey]: {
-    prompt?: string;
-    options?: string[];
-    required: boolean;
-  };
-} = {
+export interface ConfigField {
+  prompt?: string;
+  options?: string[];
+  handler?: (config: Config, value: string) => string;
+  required: boolean;
+}
+
+export type ConfigProperty = {
+  [K in ConfigKey]: ConfigField;
+};
+
+export const ConfigSchema: ConfigProperty = {
   voltaicName: {
-    prompt: logs.rgb(infoRGB, "Enter your Voltaic username"),
+    prompt: logs.rgb(infoRGB, "Enter your Voltaic Username"),
     required: true,
   },
   apiUrl: { required: true },
   aimtrainer: {
-    prompt: logs.rgb(infoRGB, "Enter your Voltaic username"),
+    prompt: logs.rgb(infoRGB, "Enter your Voltaic Aimtrainer"),
     options: AimtrainerTypes,
     required: true,
   },
   skilltier: {
-    prompt: logs.rgb(infoRGB, "Enter your Voltaic username"),
+    prompt: logs.rgb(infoRGB, "Enter your Voltaic Skill Tier"),
     options: SkillTierTypes,
     required: true,
   },
+  season: {
+    prompt: logs.rgb(infoRGB, "Enter your desired Voltaic Season to track"),
+    handler: (config, value) => `${config.aimtrainer}_${value}`,
+    required: true,
+  },
+  steamId: {
+    prompt: logs.rgb(infoRGB, "Enter your Steam ID"),
+    required: true,
+  }
 };
 
 export type Config = {
   [key in ConfigKey]: string | number | null;
 };
 
+
 export const DefaultConfig: Config = {
   voltaicName: null,
   apiUrl: "https://beta.voltaic.gg/api",
   aimtrainer: "kovaaks",
   skilltier: "novice",
+  season: "kovaaks_s5",
+  steamId: null,
 };
 
 function promptForValue(message: string, key: ConfigKey, config: Config) {
@@ -66,9 +83,10 @@ function promptForValue(message: string, key: ConfigKey, config: Config) {
     }
   }
 
-  config[key] = data.trim().toLocaleLowerCase();
+  const formattedData = data.trim().toLocaleLowerCase();
+  config[key] = schema.handler ? schema.handler(config, formattedData) : formattedData;
 
-  return data;
+  return config;
 }
 
 export async function setupNewConfig(db: any) {
